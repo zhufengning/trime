@@ -211,7 +211,11 @@ class InputView(
             preedit.ui.root,
             lParams(wrapContent, wrapContent) {
                 above(keyboardView)
-                startOfParent()
+                if (AppPrefs.defaultInstance().keyboard.giantHardMode.getValue()) {
+                    centerHorizontally()
+                } else {
+                    startOfParent()
+                }
             },
         )
 

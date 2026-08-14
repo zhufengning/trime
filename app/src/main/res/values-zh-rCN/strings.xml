@@ -99,6 +99,8 @@
     <string name="hook_shift_num">点击0-9时，忽略Shift的锁定状态</string>
     <string name="hook_shift_symbol">点击符号键时，忽略Shift的锁定状态</string>
     <string name="hook_shift_arrow">点击方向键时，保持Shift的锁定状态</string>
+    <string name="giant_hard_mode">巨硬模式</string>
+    <string name="giant_hard_mode_summary">候选词按 2 3 1 4 5 排列；Shift/Sym/空格/Ctrl/Alt 分别上屏第 2/3/1/4/5 个候选；双击 Alt 翻页</string>
     <string name="developer">开发者</string>
     <string name="export">导出</string>
     <string name="scroll_to_bottom">跳到最后</string>

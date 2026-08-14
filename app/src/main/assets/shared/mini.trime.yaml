@@ -1,0 +1,131 @@
+# SPDX-FileCopyrightText: 2015 - 2024 Rime community
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# 迷你主题：基于「預設」主题，默认显示空键盘（高度 0，配合物理键盘输入），不包含全键盘
+# encoding: utf-8
+
+config_version: "3.0"
+name: 迷你 #方案名稱
+author: osfans #作者資訊
+
+# 继承「預設」主题的全部样式、配色与按键定义
+__include: trime:/
+
+# 键盘高度覆盖为 0（默认空键盘不占空间；数字/符号键盘单独指定高度）
+style:
+  keyboard_height: 0
+  keyboard_height_land: 0
+  candidate_text_size: 28 #候选字号
+  candidate_view_height: 36 #候选栏高度
+  candidate_spacing: 1 #候选分割线宽度
+
+# 工具栏：中英文指示器（点击切换中英文）
+tool_bar:
+  buttons:
+    - foreground:
+        option_styles: ["中", "En"]
+        font_size: 18
+        padding: 10
+      action: Mode_switch
+
+# 仅保留空键盘（作为默认键盘）、数字键盘与符号键盘，移除所有全键盘
+preset_keyboards/=:
+  default:
+    name: 空
+    ascii_mode: 0
+    lock: true #切換程序時記憶鍵盤
+    keys: []
+  number:
+    name: 預設數字
+    author: "osfans <waxaca@163.com>"
+    width: 20
+    height: 44
+    keyboard_height: 250
+    keyboard_height_land: 200
+    keys:
+    - {click: '+'}
+    - {click: 'KP_1'}
+    - {click: 'KP_2'}
+    - {click: 'KP_3'}
+    - {click: '#'}
+    - {click: '-'}
+    - {click: 'KP_4'}
+    - {click: 'KP_5'}
+    - {click: 'KP_6'}
+    - {click: '%'}
+    - {click: '*'}
+    - {click: 'KP_7'}
+    - {click: 'KP_8'}
+    - {click: 'KP_9'}
+    - {click: ':'}
+    - {click: '/'}
+    - {click: '±'}
+    - {click: 'KP_0'}
+    - {click: '.'}
+    - {click: ','}
+    - {click: '='}
+    - {click: Keyboard_default, long_click: Keyboard_symbols}
+    - {click: space}
+    - {click: BackSpace}
+    - {click: Return}
+  symbols:
+    name: 符號
+    author: "天真可愛的滿滿"
+    ascii_mode: 1
+    width: 10
+    height: 44
+    keyboard_height: 250
+    keyboard_height_land: 200
+    keys:
+    - {click: '1'}
+    - {click: '2'}
+    - {click: '3'}
+    - {click: '4'}
+    - {click: '5'}
+    - {click: '6'}
+    - {click: '7'}
+    - {click: '8'}
+    - {click: '9'}
+    - {click: '0'}
+    - {click: '~',long_click: '`'}
+    - {click: '!'}
+    - {click: '@'}
+    - {click: '#'}
+    - {click: '$'}
+    - {click: '￥'}
+    - {click: '%'}
+    - {click: '^'}
+    - {click: '&'}
+    - {click: '*'}
+    - {click: '(', long_click: '{'}
+    - {click: ')', long_click: '}'}
+    - {click: '[', long_click: '【'}
+    - {click: ']', long_click: '】'}
+    - {click: '「', long_click: '『'}
+    - {click: '」', long_click: '』'}
+    - {click: '、', ascii: '\', long_click: '|'}
+    - {click: '/', long_click: '√'}
+    - {click: ':'}
+    - {click: ';'}
+    - {click: '+'}
+    - {click: '-', long_click: '_'}
+    - {click: '='}
+    - {click: '〈', long_click: '《', ascii: '<'}
+    - {click: '〉', long_click: '》', ascii: '>'}
+    - {click: '“', ascii: '"', long_click: '‘'}
+    - {click: '”', ascii: "'", long_click: '’'}
+    - {click: '，', ascii: ',', long_click: one_hand_switch_1}
+    - {click: '？', ascii: '?', long_click: one_hand_switch_3}
+    - {click: BackSpace, long_click: Escape}
+    - {click: Keyboard_default, long_click: Menu, width: 15}
+    - {click: Keyboard_number, long_click: Color_switch}
+    - {click: Keyboard_mini, long_click: Theme_settings}
+    - {click: space, width: 30}
+    - {click: '。', ascii: '.'}
+    - {click: liquid_keyboard_switch, long_click: Delete}
+    - {click: Return, long_click: select_all, width: 15}
+
+# 将「迷你」键指向默认键盘（即空键盘）
+__patch:
+  preset_keys/Keyboard_mini/select: .default

@@ -12,9 +12,12 @@ import androidx.transition.Transition
 import androidx.transition.TransitionManager
 import androidx.transition.TransitionSet
 import com.osfans.trime.R
+import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.ime.broadcast.InputBroadcaster
 import com.osfans.trime.ime.dependency.InputDependencyManager
+import com.osfans.trime.ime.keyboard.KeyboardWindow
 import org.kodein.di.instance
+import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
@@ -24,6 +27,7 @@ import timber.log.Timber
 class BoardWindowManager {
     private val context: Context by InputDependencyManager.getInstance().di.instance()
     private val broadcaster: InputBroadcaster by InputDependencyManager.getInstance().di.instance()
+    private val theme: Theme by InputDependencyManager.getInstance().di.instance()
 
     private val cachedResidentWindows = mutableMapOf<ResidentWindow.Key, Pair<BoardWindow, View?>>()
 
@@ -104,6 +108,13 @@ class BoardWindowManager {
             window.beforeAttached()
         }
         view.apply { add(newView, lParams(matchParent, matchParent)) }
+        // 空键盘主题（键盘高度 0）时：非键盘窗口需要正常高度才能显示，键盘窗口恢复 0 高度
+        if (theme.generalStyle.keyboardHeight <= 0) {
+            view.layoutParams?.let { lp ->
+                lp.height = if (window is KeyboardWindow) 0 else context.dp(250)
+                view.layoutParams = lp
+            }
+        }
         currentView = newView
         Timber.d("Attach $window")
         window.onAttached()

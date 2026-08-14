@@ -177,4 +177,9 @@ class CandidateItemUi(
         comment.setTextColor(cColor)
         comment.isVisible = commentText.isNotEmpty()
     }
+
+    fun setMaxWidth(maxWidth: Int) {
+        text.maxWidth = maxWidth
+        comment.maxWidth = maxWidth
+    }
 }

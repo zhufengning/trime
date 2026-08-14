@@ -103,6 +103,8 @@
     <string name="hook_shift_num">Ignore Shift locked for 0-9</string>
     <string name="hook_shift_symbol">Ignore Shift locked for Symbol keys</string>
     <string name="hook_shift_arrow">Keep Shift locked for Arrow keys</string>
+    <string name="giant_hard_mode">Giant Hard Mode</string>
+    <string name="giant_hard_mode_summary">Show 5 candidates in 2-3-1-4-5 order; Shift/Sym/Space/Ctrl/Alt select the 2nd/3rd/1st/4th/5th candidate; double-tap Alt to page</string>
     <string name="exception_logcat_created">Logcat process is already created</string>
     <string name="app_crash">Application crashed</string>
     <string name="app_crash_message">Sorry, but we bring you some logs to investigate.</string>

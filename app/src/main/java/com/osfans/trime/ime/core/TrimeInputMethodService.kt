@@ -47,7 +47,9 @@ import com.osfans.trime.data.prefs.PreferenceDelegateProvider
 import com.osfans.trime.data.theme.ColorManager
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.data.theme.ThemeManager
+import com.osfans.trime.ime.candidates.compact.CompactCandidateDelegate
 import com.osfans.trime.ime.composition.CandidatesView
+import com.osfans.trime.ime.dependency.InputDependencyManager
 import com.osfans.trime.ime.keyboard.InputFeedbackManager
 import com.osfans.trime.receiver.RimeIntentReceiver
 import com.osfans.trime.util.any
@@ -60,7 +62,10 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.kodein.di.direct
+import org.kodein.di.instance
 import splitties.bitflags.hasFlag
 import splitties.systemservices.clipboardManager
 import splitties.systemservices.inputMethodManager
@@ -201,8 +206,17 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     private fun handleRimeMessage(it: RimeMessage<*>) {
         when (it) {
             is RimeMessage.CommitTextMessage -> {
-                if (!it.data.text.isNullOrEmpty()) {
-                    commitText(it.data.text)
+                val text = it.data.text
+                Timber.d("巨硬 CommitTextMessage: text=$text suppress=$suppressNextRimeCommit")
+                if (!text.isNullOrEmpty()) {
+                    // Rime 已完成整段上屏，清空累计的 Alt 视觉上屏文字
+                    giantHardAccumulatedText = ""
+                }
+                if (suppressNextRimeCommit) {
+                    // 巨硬模式 Alt 上屏：视觉文本已上屏，抑制 Rime 的重复上屏
+                    suppressNextRimeCommit = false
+                } else if (!text.isNullOrEmpty()) {
+                    commitText(text)
                 }
             }
             is RimeMessage.InlinePreeditMessage -> {
@@ -562,6 +576,8 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
+        // 退出输入法：确认待确认的 Alt 上屏
+        confirmAltCommit()
         decorLocationUpdated = false
         inputDeviceManager.onFinishInputView()
         currentInputConnection?.apply {
@@ -725,6 +741,16 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        // 巨硬模式：Alt 上屏待确认时，按下其他键视为不会再双击，先确认上屏
+        if (giantHardAltPending && !isGiantHardAltKey(keyCode)) {
+            confirmAltCommit()
+        }
+        if (handleGiantHardKeyDown(keyCode)) return true
+        if (keyCode == KeyEvent.KEYCODE_SYM) {
+            // 物理键盘 Sym 键：切到符号面板（单向，通过 _keyboard_ 运行时选项触发）
+            postRimeJob { setRuntimeOption("_keyboard_symbols", true) }
+            return true
+        }
         if (inputDeviceManager.evaluateOnKeyDown(event, this)) {
             decorLocationUpdated = false
             forceShowSelf()
@@ -735,7 +761,139 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     override fun onKeyUp(
         keyCode: Int,
         event: KeyEvent,
-    ): Boolean = forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
+    ): Boolean {
+        if (giantHardInterceptedKeys.remove(keyCode)) return true
+        if (keyCode == KeyEvent.KEYCODE_SYM) return true
+        return forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
+    }
+
+    // ========== 巨硬模式：物理键盘候选选择 ==========
+
+    private val giantHardInterceptedKeys = mutableSetOf<Int>()
+    private var giantHardAltPending = false
+    private var giantHardAltText = ""
+    private var giantHardAltConfirmJob: Job? = null
+    private var giantHardAccumulatedText = ""
+    private val giantHardDoubleTapTimeoutMs = 300L
+    private var suppressNextRimeCommit = false
+
+    private val compactCandidateDelegate: CompactCandidateDelegate
+        get() = InputDependencyManager.getInstance().di.direct.instance()
+
+    private fun isGiantHardKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
+        KeyEvent.KEYCODE_SYM,
+        KeyEvent.KEYCODE_SPACE,
+        KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT,
+        KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT,
+        -> true
+        else -> false
+    }
+
+    private fun isGiantHardAltKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT -> true
+        else -> false
+    }
+
+    private fun handleGiantHardKeyDown(keyCode: Int): Boolean {
+        if (!prefs.keyboard.giantHardMode.getValue()) return false
+        if (!rime.run { hasMenu }) return false
+        if (!isGiantHardKey(keyCode)) return false
+        giantHardInterceptedKeys.add(keyCode)
+        val offset = compactCandidateDelegate.giantHardPageOffset
+        Timber.d("巨硬 按键：keyCode=$keyCode offset=$offset")
+        when (keyCode) {
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT ->
+                postRimeJob { commitGiantHardCandidate(offset + 1, "Shift") }
+            KeyEvent.KEYCODE_SYM ->
+                postRimeJob { commitGiantHardCandidate(offset + 2, "Sym") }
+            KeyEvent.KEYCODE_SPACE ->
+                postRimeJob { commitGiantHardCandidate(offset + 0, "Space") }
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT ->
+                postRimeJob { commitGiantHardCandidate(offset + 3, "Ctrl") }
+            KeyEvent.KEYCODE_ALT_LEFT, KeyEvent.KEYCODE_ALT_RIGHT ->
+                handleGiantHardAltTap()
+        }
+        return true
+    }
+
+    private suspend fun RimeApi.commitGiantHardCandidate(index: Int, key: String) {
+        val text = getCandidates(index, 1).firstOrNull()?.text ?: ""
+        Timber.d("巨硬 上屏 $key：index=$index text=$text")
+        selectCandidate(index, true)
+    }
+
+    private fun handleGiantHardAltTap() {
+        if (giantHardAltPending) {
+            // 双击：撤回视觉上屏、翻页（自维护偏移）
+            Timber.d("巨硬 Alt 双击：撤回并翻页")
+            giantHardAltPending = false
+            giantHardAltConfirmJob?.cancel()
+            giantHardAltConfirmJob = null
+            val text = giantHardAltText
+            giantHardAltText = ""
+            if (text.isNotEmpty()) {
+                currentInputConnection?.deleteSurroundingText(text.length, 0)
+            }
+            compactCandidateDelegate.giantHardNextPage()
+        } else {
+            // 单击：立即视觉上屏（不触发 Rime，避免词频等副作用），进入确认窗口
+            Timber.d("巨硬 Alt 单击：视觉上屏")
+            giantHardAltPending = true
+            lifecycleScope.launch {
+                val text =
+                    rime.runOnReady {
+                        val offset = compactCandidateDelegate.giantHardPageOffset
+                        val selected = getCandidates(offset + 4, 1).firstOrNull()?.text ?: ""
+                        val highlighted = getCandidates(offset, 1).firstOrNull()?.text ?: ""
+                        val preview = compositionCached.commitTextPreview ?: ""
+                        // commitTextPreview = 已确认文字 + 当前高亮候选文字
+                        val confirmedRaw =
+                            if (highlighted.isNotEmpty() && preview.endsWith(highlighted)) {
+                                preview.removeSuffix(highlighted)
+                            } else {
+                                ""
+                            }
+                        // 去掉之前已通过 Alt 视觉上屏的部分，避免重复上屏
+                        val confirmed =
+                            if (giantHardAccumulatedText.isNotEmpty() && confirmedRaw.endsWith(giantHardAccumulatedText)) {
+                                confirmedRaw.removeSuffix(giantHardAccumulatedText)
+                            } else {
+                                confirmedRaw
+                            }
+                        Timber.d("巨硬 Alt 单击取候选：offset=$offset selected=$selected highlighted=$highlighted preview=$preview confirmedRaw=$confirmedRaw confirmed=$confirmed")
+                        confirmed + selected
+                    }
+                if (!giantHardAltPending) return@launch
+                if (text.isNotEmpty()) {
+                    commitText(text)
+                    giantHardAltText = text
+                }
+                giantHardAltConfirmJob =
+                    lifecycleScope.launch {
+                        delay(giantHardDoubleTapTimeoutMs)
+                        confirmAltCommit()
+                    }
+            }
+        }
+    }
+
+    private fun confirmAltCommit() {
+        if (!giantHardAltPending) return
+        giantHardAltPending = false
+        giantHardAltConfirmJob?.cancel()
+        giantHardAltConfirmJob = null
+        val text = giantHardAltText
+        giantHardAltText = ""
+        if (text.isNotEmpty()) {
+            // 不撤回视觉上屏，直接触发 Rime 上屏（带词频），但抑制 Rime 的重复上屏
+            giantHardAccumulatedText += text
+            suppressNextRimeCommit = true
+            val offset = compactCandidateDelegate.giantHardPageOffset
+            Timber.d("巨硬 confirmAltCommit：text=$text offset=$offset")
+            postRimeJob { commitGiantHardCandidate(offset + 4, "Alt确认") }
+        }
+    }
 
     // Added in API level 14, deprecated in 29
     // it's needed because editors still use it even on API 36

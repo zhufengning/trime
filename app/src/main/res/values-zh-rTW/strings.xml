@@ -103,6 +103,8 @@
     <string name="hook_shift_num">點擊0-9時，忽略Shift的鎖定狀態</string>
     <string name="hook_shift_symbol">點擊符號鍵時，忽略Shift的鎖定狀態</string>
     <string name="hook_shift_arrow">點選方向鍵時，保持Shift的鎖定狀態</string>
+    <string name="giant_hard_mode">巨硬模式</string>
+    <string name="giant_hard_mode_summary">候選詞按 2 3 1 4 5 排列；Shift/Sym/空白/Ctrl/Alt 分別上屏第 2/3/1/4/5 個候選；雙擊 Alt 翻頁</string>
     <string name="export">匯出</string>
     <string name="scroll_to_bottom">跳到最後</string>
     <string name="app_crash_message">抱歉，但我們為您帶來了一些紀錄檔以供調查。</string>
