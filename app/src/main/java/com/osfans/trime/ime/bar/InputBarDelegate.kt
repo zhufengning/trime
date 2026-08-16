@@ -128,13 +128,23 @@ class InputBarDelegate : InputBroadcastReceiver {
     }
 
     private val alwaysUi: AlwaysUi by lazy {
-        AlwaysUi(context, theme) { action ->
-            if (action.isNotEmpty()) {
-                commonKeyboardActionListener.listener.onAction(KeyActionManager.getAction(action))
-            } else {
-                windowManager.attachWindow(SwitchOptionWindow())
-            }
-        }.apply {
+        AlwaysUi(
+            context,
+            theme,
+            { action ->
+                if (action.isNotEmpty()) {
+                    commonKeyboardActionListener.listener.onAction(KeyActionManager.getAction(action))
+                } else {
+                    windowManager.attachWindow(SwitchOptionWindow())
+                }
+            },
+            { delta ->
+                when {
+                    delta > 0 -> commonKeyboardActionListener.listener.onAction(KeyActionManager.getAction("Right"))
+                    delta < 0 -> commonKeyboardActionListener.listener.onAction(KeyActionManager.getAction("Left"))
+                }
+            },
+        ).apply {
             hideKeyboardButton.apply {
                 setOnClickListener { service.requestHideSelf(0) }
                 onSwipe = swipeDownHideKeyboardCallback

@@ -13,6 +13,7 @@ import androidx.core.view.children
 import com.osfans.trime.R
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.data.theme.model.ToolBar
+import com.osfans.trime.ime.keyboard.GestureFrame
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
@@ -25,12 +26,14 @@ import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.view
 import timber.log.Timber
 
 class AlwaysUi(
     override val ctx: Context,
     private val theme: Theme,
     private val onButtonClick: ((String) -> Unit)? = null,
+    private val onCursorSlide: ((Int) -> Unit)? = null,
 ) : Ui {
     enum class State {
         Toolbar,
@@ -86,7 +89,7 @@ class AlwaysUi(
             add(inlineSuggestionsUi.root, lParams(matchParent, matchParent))
         }
 
-    override val root: ConstraintLayout = constraintLayout {
+    private val content: ConstraintLayout = constraintLayout {
         val (leftWidth, leftHeight) = buttonsUi.getButtonSize(theme.toolBar.primaryButton)
         val (rightWidth, rightHeight) = buttonsUi.getButtonSize(theme.toolBar.buttons.firstOrNull())
 
@@ -115,6 +118,16 @@ class AlwaysUi(
         )
     }.apply {
         updateRightMostButton(State.Toolbar)
+    }
+
+    override val root = view(::GestureFrame) {
+        add(content, lParams(matchParent, matchParent))
+    }.apply {
+        isSlideCursor = true
+        interceptSlide = true
+        onSlide = { delta, _, _ ->
+            onCursorSlide?.invoke(delta)
+        }
     }
 
     fun updateButtonsStyle(option: String, enabled: Boolean) {

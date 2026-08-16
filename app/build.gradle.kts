@@ -26,7 +26,7 @@ android {
         minSdk = 21
         targetSdk = 36
         versionCode = 20260901
-        versionName = "3.3.12"
+        versionName = "3.3.12-titan2"
 
         multiDexEnabled = true
         buildConfigField("String", "BUILDER", "\"${project.builder}\"")

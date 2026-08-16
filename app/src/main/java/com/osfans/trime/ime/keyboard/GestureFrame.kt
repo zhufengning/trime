@@ -64,6 +64,14 @@ open class GestureFrame(context: Context) : FrameLayout(context) {
     var isSlideCursor = false
     var isSlideDelete = false
 
+    /**
+     * When enabled, horizontal slide gestures that start on a child view are
+     * intercepted so that [onSlide] receives deltas for the whole frame area.
+     * This allows a toolbar containing clickable children to still support
+     * slide-cursor gestures without breaking child clicks.
+     */
+    var interceptSlide = false
+
     var hasLongPress = false
     var hasDouble = false
     var hasLazyDouble = false
@@ -78,6 +86,58 @@ open class GestureFrame(context: Context) : FrameLayout(context) {
         isFocusableInTouchMode = false
     }
 
+    /**
+     * Records the common per-gesture state without changing the pressed state
+     * or emitting press feedback. Used for both touches handled directly by
+     * this frame and touches intercepted from a child view.
+     */
+    private fun beginGesture(event: MotionEvent): Int {
+        touchId = (touchId + 1) and 0xFFFF
+        startX = event.x
+        startY = event.y
+        lastX = startX
+        startTime = SystemClock.elapsedRealtime()
+
+        isLongPressed = false
+        slideActivated = false
+        swipeTriggered = false
+        lastSwipeBehavior = KeyBehavior.CLICK
+        return touchId
+    }
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        if (!interceptSlide || onSlide == null || !(isSlideCursor || isSlideDelete)) {
+            return false
+        }
+        if (!isEnabled) return false
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                // Keep tracking the gesture even though a child may consume it,
+                // so slides can be taken over once they become horizontal.
+                beginGesture(event)
+                return false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = event.x - startX
+                val dy = event.y - startY
+                if (!slideActivated &&
+                    !isLongPressed &&
+                    swipeTravel > 0 &&
+                    abs(dx) >= swipeTravel &&
+                    abs(dx) > abs(dy)
+                ) {
+                    slideActivated = true
+                    // Discard the original travel so the cursor follows the
+                    // finger without making an initial jump.
+                    lastX = startX
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x
@@ -85,17 +145,7 @@ open class GestureFrame(context: Context) : FrameLayout(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (!isEnabled) return false
-                touchId = (touchId + 1) and 0xFFFF
-                val currentTouchId = touchId
-                startX = x
-                startY = y
-                lastX = startX
-                startTime = SystemClock.elapsedRealtime()
-
-                isLongPressed = false
-                slideActivated = false
-                swipeTriggered = false
-                lastSwipeBehavior = KeyBehavior.CLICK
+                val currentTouchId = beginGesture(event)
 
                 drawableHotspotChanged(x, y)
                 isPressed = true
